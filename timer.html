@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>timer</title>
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Tahoma, Geneva, sans-serif;
+  width: 100%;
+}
+.content {
+  width: 600px;
+  margin: 0 auto;
+}
+.big, .small {
+  margin: 0;
+  padding: 0;
+}
+.timer {
+  text-align: center;
+  word-spacing: -0.2em;
+}
+#time {
+  font-size: 4.5em;
+  color: #444;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding: 0.2em 0;
+}
+#total {
+  font-size: 2.5em;
+  color: #666;
+  margin-bottom: 1.5em;
+}
+.red {
+  background-color: #fba;
+}
+.sign {
+  width: 0.8em;
+  text-align: center;
+  display: inline-block;
+}
+.big {
+  margin-right: 0.4em;
+}
+.small {
+  font-size: 0.6em;
+}
+button {
+  color: #555;
+  font: inherit;
+  background-color: inherit;
+  border: 0.1em solid #555;
+  font-size: 2em;
+  width: 3em;
+  height: 2em;
+  border-radius: 0.2em;
+  transition: background-color 0.5s;
+  cursor: pointer;
+}
+button:hover {
+  background-color: #ccc;
+}
+#interval {
+  box-sizing: border-box;
+  color: #555;
+  font: inherit;
+  font-size: 2em;
+  /*display: block;*/
+  height: 2em;
+  width: 5em;
+  outline: none;
+  border: none;
+  border-bottom: 1px solid #555;
+  border-top: 1px solid #555;
+  text-align: right;
+  padding: 0;
+  margin: 0;
+}
+</style>
+  </head>
+  <body>
+    <div class="content">
+      <div class="timer" id="time">
+        <span class="center">
+          <span class="sign" id="time-sign">+</span><!--
+          --><span class="big" id="time-big">0:00:00.0</span><!--
+          --><span class="small" id="time-small">00</span>
+        </span>
+      </div>
+      <div class="timer" id="total">
+        <span class="center">
+          <span class="sign" id="total-sign">+</span><!--
+          --><span class="big" id="total-big">0:00:00.0</span><!--
+          --><span class="small" id="total-small">00</span>
+        </span>
+      </div>
+      <input id="interval" type="text" value="1:30"></input>
+      <button id="start">start</button>
+      <button id="reset">reset</button>
+    </div>
+  <script>
+"use strict";
+let active = false;
+let last = -1;
+
+let remaining = 0;
+let total = 0;
+
+
+let timeElems = {
+  root: document.getElementById("time"),
+  sign: document.getElementById("time-sign"),
+  big: document.getElementById("time-big"),
+  small: document.getElementById("time-small"),
+};
+
+let totalElems = {
+  root: document.getElementById("total"),
+  sign: document.getElementById("total-sign"),
+  big: document.getElementById("total-big"),
+  small: document.getElementById("total-small"),
+};
+
+let buttons = {
+  start: document.getElementById("start"),
+  reset: document.getElementById("reset"),
+}
+
+let inputs = {
+  time: document.getElementById("interval"),
+}
+
+let beep1 = new Audio("beep.mp3");
+beep1.preload = "auto";
+
+let beep2 = new Audio("beep2.mp3");
+beep2.preload = "auto";
+
+function parseTime(str) {
+  let m;
+  m = str.match("^[ \t]*([0-9][0-9]?):([0-9][0-9]?):([0-9][0-9]?)[ \t]*$");
+  if (m !== null) {
+    return parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseInt(m[3]);
+  }
+  m = str.match("^[ \t]*([0-9][0-9]?):([0-9][0-9]?)[ \t]*$")
+  if (m !== null) {
+    return parseInt(m[1]) * 60 + parseInt(m[2]);
+  }
+  m = str.match("^[ \t]*([0-9][0-9]?)[ \t]*$")
+  if (m !== null) {
+    return parseInt(m[1]);
+  }
+  return null;
+}
+
+function breakUpTime(t) {
+  let sign = t >= 0;
+  if (!sign) t = -t;
+  let hours = Math.floor(t / 3600);
+  t = t % 3600;
+  let minutes = Math.floor(t / 60);
+  t = t % 60;
+  let seconds = Math.floor(t);
+  t = t - seconds;
+  let hundreds = Math.floor(t*10);
+  t = t - (hundreds/10);
+  let millis = Math.floor(t*1000);
+  return [sign, hours, minutes, seconds, hundreds, millis];
+}
+
+function numPad(num, chars) {
+    var s = String(num);
+    while (s.length < (chars)) {s = "0" + s;}
+    return s;
+}
+
+function updateTimer(time, elems, threshold) {
+  if (threshold !== undefined && time < threshold) {
+    elems.root.classList.add("red");
+  } else {
+    elems.root.classList.remove("red");
+  }
+  let t = breakUpTime(time);
+  let sign = t[0]?"+":"-",
+    hours = numPad(t[1],2),
+    mins = numPad(t[2],2),
+    secs = numPad(t[3],2),
+    hundreds = String(t[4]),
+    millis = numPad(t[5], 2);
+  elems.sign.textContent = sign;
+  elems.big.textContent = ` ${hours} : ${mins} : ${secs} . ${hundreds}`;
+  elems.small.textContent = millis;
+}
+
+function updateView() {
+  updateTimer(remaining, timeElems, 10);
+  updateTimer(total, totalElems);
+  if (active) {
+    buttons.start.firstChild.data = "stop";
+  } else {
+    buttons.start.firstChild.data = "start";
+  }
+}
+
+function tick(stamp) {
+  if (active) {
+    window.requestAnimationFrame(tick);
+  } else {
+    updateView();
+    return;
+  }
+  let now = (stamp || performance.now()) / 1e3;
+  if (last < 0) {
+    last = now;
+  }
+  let diff = now - last;
+  remaining -= diff;
+  total += diff;
+  last = now;
+  updateView();
+  if (remaining <= 10 && remaining + diff > 10) {
+    beep1.play();
+  }
+  if (remaining <= 0 && remaining + diff > 0) {
+    beep2.play();
+  }
+}
+
+function start() {
+  active = true;
+  last = -1;
+  tick();
+}
+
+function stop() {
+  active = false;
+  updateView();
+}
+
+function toggle() {
+  if (active) {
+    stop();
+  } else {
+    start();
+  }
+}
+
+function reset() {
+  let newRemaining = parseTime(inputs.time.value);
+  if (newRemaining !== null) {
+    remaining = newRemaining;
+    updateView();
+  } else {
+    flash(inputs.time, "#fbb");
+  }
+}
+
+function flash(elem, color) {
+  console.log('flashing');
+  let oldBg = elem.style.backgroundColor;
+  let oldTr = elem.style.transition;
+  elem.style.backgroundColor = color;
+  elem.style.transition = "";
+  setTimeout(() => {
+    elem.style.transition = "background-color 0.5s";
+    elem.style.backgroundColor = oldBg;
+    setTimeout(() => {
+      elem.style.transition = oldTr;
+    }, 500);
+  }, 1);
+}
+
+document.addEventListener('keypress', (ev) => {
+  if (ev.code == "Space" && ev.target != inputs.time) {
+    toggle();
+    return false;
+  }
+  if (ev.code == "Enter") {
+    if (ev.target == inputs.time) {
+      start();
+    }
+    reset();
+    return false;
+  }
+});
+
+buttons.start.addEventListener('click', () => {
+  toggle();
+});
+
+buttons.reset.addEventListener('click', () => {
+  reset();
+});
+
+reset();
+  </script>
+  </body>
+</html>
