@@ -132,10 +132,12 @@ let inputs = {
   time: document.getElementById("interval"),
 }
 
-let beep1 = new Audio("beep.mp3");
+let beep1 = new Audio();
+beep1.src = "./beep.mp3";
 beep1.preload = "auto";
 
-let beep2 = new Audio("beep2.mp3");
+let beep2 = new Audio();
+beep2.src = "beep2.mp3";
 beep2.preload = "auto";
 
 function parseTime(str) {
